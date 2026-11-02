@@ -349,3 +349,33 @@ test('data routes reject write operations', async t => {
   assert.equal((await call('/activities/123/analysis', {}, ACTION)).status, 405);
   assert.equal(state.calls.length, before);
 });
+
+test('MCP discovery is authenticated and exposes only the five read tools', async t => {
+  const { call } = await fixture(t);
+  const rpc = (method, params = {}) => ({ jsonrpc: '2.0', id: 1, method, params });
+  assert.equal((await call('/mcp', rpc('tools/list'), 'wrong-key')).status, 401);
+  assert.equal((await call('/mcp', rpc('tools/list'), ADMIN)).status, 401);
+  const initialized = await call('/mcp', rpc('initialize', { protocolVersion: '2025-03-26' }), ACTION);
+  assert.equal(initialized.data.result.protocolVersion, '2025-03-26');
+  const listed = await call('/mcp', rpc('tools/list'), ACTION);
+  assert.deepEqual(listed.data.result.tools.map(x => x.name).sort(), ['getActivityAnalysis', 'getActivityMetrics', 'getActivitySection', 'getWellness', 'listActivities']);
+  assert.ok(listed.data.result.tools.every(x => x.annotations.readOnlyHint && !x.annotations.destructiveHint));
+});
+
+test('MCP validates input and reuses the existing Garmin read handlers', async t => {
+  const { call, connect, state, mf } = await fixture(t);
+  const rpc = (name, args) => ({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name, arguments: args } });
+  await connect();
+  const before = state.calls.length;
+  for (const [name, args] of [['disconnect', {}], ['listActivities', { limit: 51 }], ['listActivities', { url: 'https://evil.invalid' }], ['getActivityAnalysis', { activity_id: '../admin/disconnect' }], ['getWellness', { date: '2026-02-30', section: 'sleep' }]]) {
+    assert.equal((await call('/mcp', rpc(name, args), ACTION)).data.error.code, -32602);
+  }
+  assert.equal(state.calls.length, before);
+  const read = await call('/mcp', rpc('listActivities', { limit: 1 }), ACTION);
+  assert.equal(read.data.result.isError, undefined);
+  assert.ok(JSON.parse(read.data.result.content[0].text));
+  assert.ok(state.calls.length > before);
+  const rejected = await mf.dispatchFetch('https://coach.example/mcp', { method: 'POST', headers: { Authorization: `Bearer ${ACTION}`, Origin: 'https://evil.invalid', 'Content-Type': 'application/json' }, body: JSON.stringify(rpc('listActivities', {})) });
+  assert.equal(rejected.status, 403);
+});
+
