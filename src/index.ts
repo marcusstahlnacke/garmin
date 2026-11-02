@@ -1,3 +1,4 @@
+import { handleMcp } from "./mcp";
 import { DurableObject } from "cloudflare:workers";
 import { AppError, equalSecret, field, json, readJSON, Sealed, Vault } from "./common";
 import { completeMFA, GarminClient, login, Pending, Session } from "./garmin";
@@ -8,6 +9,7 @@ import { schema } from "./schema";
 export interface Env {
   GARMIN: DurableObjectNamespace<GarminAccount>;
   ACTION_API_KEY: string;
+  MCP_ALLOWED_ORIGINS?: string;
   ADMIN_API_KEY: string;
   SESSION_ENCRYPTION_KEY: string;
 }
@@ -142,6 +144,10 @@ export default {
         if (path === "/health") return json({ status: "ok", garmin_connection: "not_checked" });
       }
       if (!env.ACTION_API_KEY || !env.ADMIN_API_KEY || env.ACTION_API_KEY === env.ADMIN_API_KEY) throw new AppError(503, "configure_separate_api_keys");
+      if (path === "/mcp") {
+        const id = env.GARMIN.idFromName("personal-account-v1");
+        return (await handleMcp(request, env, read => env.GARMIN.get(id).fetch(read)))!;
+      }
       const admin = path.startsWith("/admin/");
       if (!await equalSecret(request.headers.get("Authorization")?.replace(/^Bearer /, "") || "", (admin ? env.ADMIN_API_KEY : env.ACTION_API_KEY) || "")) throw new AppError(401, "unauthorized");
       const id = env.GARMIN.idFromName("personal-account-v1");
@@ -149,3 +155,4 @@ export default {
     } catch (error) { return failure(error); }
   },
 } satisfies ExportedHandler<Env>;
+
