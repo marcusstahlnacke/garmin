@@ -107,3 +107,6 @@ API:t bevarar Garmin-fält och enheter. Koordinatfält filtreras bort; namn, ant
 - `/health` visar endast att Workern svarar. `/admin/status` visar att en session är sparad; inget av dessa är ett funktionstest mot Garmin.
 
 Versionen är personlig och har ett enda Garmin-konto. Dela inte den konfigurerade GPT:n eller dess API-nyckel med vänner. Per-person-inloggning och användarisolering krävs före delning.
+
+
+Automatisk driftsättning via Cloudflare Workers Builds.
