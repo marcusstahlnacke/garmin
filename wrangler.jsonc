@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "garmin-coach",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-02",
+  "workers_dev": true,
+  "send_metrics": false,
+  "observability": { "enabled": false },
+  "durable_objects": {
+    "bindings": [{ "name": "GARMIN", "class_name": "GarminAccount" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GarminAccount"] }]
+}
