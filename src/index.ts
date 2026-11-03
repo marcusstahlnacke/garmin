@@ -1,3 +1,4 @@
+import { createOAuth } from "./oauth";
 import { handleMcp } from "./mcp";
 import { DurableObject } from "cloudflare:workers";
 import { AppError, equalSecret, field, json, readJSON, Sealed, Vault } from "./common";
@@ -9,6 +10,8 @@ import { schema } from "./schema";
 export interface Env {
   GARMIN: DurableObjectNamespace<GarminAccount>;
   ACTION_API_KEY: string;
+  OAUTH_KV?: KVNamespace;
+  OAUTH_APPROVAL_KEY?: string;
   MCP_ALLOWED_ORIGINS?: string;
   ADMIN_API_KEY: string;
   SESSION_ENCRYPTION_KEY: string;
@@ -26,6 +29,17 @@ export class GarminAccount extends DurableObject<Env> {
     if (this.waiting >= 8) return json({ error: "too_many_concurrent_requests" }, 429);
     this.waiting++;
     const operation = this.queue.then(() => this.handle(request)).catch(failure).finally(() => this.waiting--);
+    this.queue = operation.then(() => undefined);
+    return operation;
+  }
+
+  async oauthRateLimit(kind: 'page' | 'approval'): Promise<boolean> {
+    if (this.waiting >= 8) return false;
+    this.waiting++;
+    const operation = this.queue.then(async () => {
+      try { await this.count('oauth:' + kind, kind === 'page' ? 100 : 10, 600_000, 'oauth_rate_limited'); return true; }
+      catch { return false; }
+    }).finally(() => this.waiting--);
     this.queue = operation.then(() => undefined);
     return operation;
   }
@@ -133,10 +147,22 @@ export class GarminAccount extends DurableObject<Env> {
   }
 }
 
+const readMcp = async (request: Request, env: Env): Promise<Response> => {
+  const id = env.GARMIN.idFromName('personal-account-v1');
+  return (await handleMcp(request, env, read => env.GARMIN.get(id).fetch(read)))!;
+};
+const oauth = createOAuth(readMcp);
+
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url), path = url.pathname;
+      const oauthRoute = path === '/authorize' || path.startsWith('/oauth/') || path.startsWith('/.well-known/');
+      if (oauthRoute || path === '/mcp') {
+        if (path === '/mcp' && await equalSecret(request.headers.get('Authorization')?.replace(/^Bearer /, '') || '', env.ACTION_API_KEY || '')) return readMcp(request, env);
+        if (!env.OAUTH_KV || !env.OAUTH_APPROVAL_KEY || env.OAUTH_APPROVAL_KEY.length < 32 || env.OAUTH_APPROVAL_KEY === env.ACTION_API_KEY || env.OAUTH_APPROVAL_KEY === env.ADMIN_API_KEY) return json({ error: 'configure_oauth' }, 503);
+        return await oauth.fetch(request, env as Parameters<typeof oauth.fetch>[1], ctx);
+      }
       if (request.method === "GET") {
         if (path === "/connect" || path === "/") return pageResponse(page, "text/html");
         if (path === "/connect.js") return pageResponse(script, "application/javascript");
@@ -155,4 +181,5 @@ export default {
     } catch (error) { return failure(error); }
   },
 } satisfies ExportedHandler<Env>;
+
 
