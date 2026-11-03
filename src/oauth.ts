@@ -26,7 +26,8 @@ async function consent(request: Request, env: OAuthEnv): Promise<Response> {
       // Suppress cross-origin referrers without turning same-origin POSTs into Origin: null.
       headers.set('Referrer-Policy', 'same-origin');
       headers.set('X-Frame-Options', 'DENY');
-      headers.set('Content-Security-Policy', "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+      // Browsers also apply form-action to the OAuth callback redirect.
+      headers.set('Content-Security-Policy', "default-src 'none'; form-action 'self' https://chatgpt.com; frame-ancestors 'none'; base-uri 'none'");
       return new Response(`<!doctype html><html lang="sv"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Anslut Garmin Coach</title>
         <h1>Anslut Garmin Coach</h1><p><strong>${escape(details.clientName)}</strong> vill läsa dina tränings- och återhämtningsdata.</p>
         <p>${details.clientDomain ? `Klientens domän: ${escape(details.clientDomain)}.` : 'Klientnamnet är självregistrerat och inte verifierat.'}</p>
