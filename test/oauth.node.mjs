@@ -46,6 +46,7 @@ test('OAuth consent, PKCE, tokens and refresh protect the five-read-tool handler
   assert.equal((await send('/authorize?' + writeScope)).status, 400);
   const page = await send('/authorize?' + query);
   assert.equal(page.status, 200);
+  assert.equal(page.headers.get('Referrer-Policy'), 'same-origin');
   const html = await page.text();
   assert.ok(!html.includes('<script>evil</script>'));
   assert.ok(html.includes('&#60;script&#62;'));
@@ -54,10 +55,12 @@ test('OAuth consent, PKCE, tokens and refresh protect the five-read-tool handler
   const post = (key, cookieValue = cookie, source = origin) => send('/authorize', { method: 'POST', headers: { Origin: source, Cookie: cookieValue, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ handle, decision: 'approve', approval_key: key }) });
   assert.equal((await post('wrong')).status, 403);
   assert.equal((await post(env.OAUTH_APPROVAL_KEY, cookie, 'https://evil.invalid')).status, 403);
+  assert.equal((await post(env.OAUTH_APPROVAL_KEY, cookie, 'null')).status, 403);
   assert.equal((await post(env.OAUTH_APPROVAL_KEY, '')).status, 400);
   assert.equal(reads, 0);
   const approved = await post(env.OAUTH_APPROVAL_KEY);
   assert.equal(approved.status, 302);
+  assert.equal(approved.headers.get('Referrer-Policy'), 'no-referrer');
   const callback = new URL(approved.headers.get('Location'));
   assert.equal(callback.searchParams.get('state'), 'test-state');
   const code = callback.searchParams.get('code');
