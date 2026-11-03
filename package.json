@@ -8,12 +8,18 @@
     "build": "wrangler deploy --dry-run --outdir dist",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test --test-concurrency=1 test/*.test.mjs",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test:oauth": "node --test test/oauth.node.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261102.1",
+    "esbuild": "0.28.2",
     "miniflare": "5.20261102.0-beta",
     "typescript": "7.0.2",
     "wrangler": "4.156.2"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "1.2.4"
   }
 }
+
