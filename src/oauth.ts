@@ -22,7 +22,9 @@ async function consent(request: Request, env: OAuthEnv): Promise<Response> {
       const headers = transaction.headers;
       headers.set('Content-Type', 'text/html; charset=utf-8');
       headers.set('Cache-Control', 'no-store');
-      headers.set('Referrer-Policy', 'no-referrer');
+      // Form POSTs need their real Origin for the strict check below.
+      // Suppress cross-origin referrers without turning same-origin POSTs into Origin: null.
+      headers.set('Referrer-Policy', 'same-origin');
       headers.set('X-Frame-Options', 'DENY');
       headers.set('Content-Security-Policy', "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
       return new Response(`<!doctype html><html lang="sv"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Anslut Garmin Coach</title>
