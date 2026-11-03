@@ -47,6 +47,7 @@ test('OAuth consent, PKCE, tokens and refresh protect the five-read-tool handler
   const page = await send('/authorize?' + query);
   assert.equal(page.status, 200);
   assert.equal(page.headers.get('Referrer-Policy'), 'same-origin');
+  assert.equal(page.headers.get('Content-Security-Policy'), "default-src 'none'; form-action 'self' https://chatgpt.com; frame-ancestors 'none'; base-uri 'none'");
   const html = await page.text();
   assert.ok(!html.includes('<script>evil</script>'));
   assert.ok(html.includes('&#60;script&#62;'));
