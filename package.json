@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test --test-concurrency=1 test/*.test.mjs",
     "deploy": "wrangler deploy",
-    "test:oauth": "node --test test/oauth.node.mjs"
+    "test:oauth": "node --test test/oauth.node.mjs",
+    "test:sleep": "node --test test/sleep.node.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261102.1",
@@ -22,4 +23,3 @@
     "@cloudflare/workers-oauth-provider": "1.2.4"
   }
 }
-

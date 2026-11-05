@@ -119,6 +119,28 @@ export async function listActivities(client: GarminClient, url: URL): Promise<Da
 }
 
 export const WELLNESS = ["daily_summary", "sleep", "hrv", "training_readiness", "training_status", "fitness_metrics"];
+
+// Daily sleep responses include large movement, stage, HR and SpO2 series.
+// Keep Garmin's named summary fields/scores without sending those collections.
+function sleepSummary(result: Data): Data {
+  if (result.status !== "available") return result;
+  const omitted: { path: string; count: number }[] = [];
+  function summary(value: any, path: string): any {
+    if (Array.isArray(value)) {
+      omitted.push({ path, count: value.length });
+      return undefined;
+    }
+    if (value === null || typeof value !== "object") return value;
+    return Object.fromEntries(Object.entries(value).flatMap(([key, item]) => {
+      const kept = summary(item, path ? `${path}.${key}` : key);
+      return kept === undefined ? [] : [[key, kept]];
+    }));
+  }
+  return { ...result, data: summary(result.data, ""), representation: "sleep_summary",
+    omitted_collections: omitted,
+    limitation: "Garmin summary fields, timestamps, units and scores are retained. Collections (including detailed time series) are omitted, not analyzed or reconstructed. Missing summary values are not zero." };
+}
+
 export async function wellness(client: GarminClient, date: string, kind: string): Promise<Data> {
   validDate(date);
   if (!WELLNESS.includes(kind)) throw new AppError(404, "unknown_section");
@@ -136,5 +158,6 @@ export async function wellness(client: GarminClient, date: string, kind: string)
     training_status: `/metrics-service/metrics/trainingstatus/aggregated/${date}`,
     fitness_metrics: `/metrics-service/metrics/maxmet/daily/${date}/${date}`,
   };
-  return section(client, paths[kind]);
+  const result = await section(client, paths[kind]);
+  return kind === "sleep" ? sleepSummary(result) : result;
 }
